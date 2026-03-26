@@ -4,13 +4,14 @@ Each client gets a unique URL: /check/{endpoint_id}?phone=...
 No API key needed — the endpoint_id IS the access token.
 """
 import asyncio
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 import database as db
 import whatsapp as wa
+import config
 
 app = FastAPI(title="WA Checker API", docs_url=None, redoc_url=None)
 
@@ -24,6 +25,13 @@ app.add_middleware(
 class BulkRequest(BaseModel):
     phones: List[str]
 
+def _base_url(request: Request) -> str:
+    """Auto-detect base URL from request if config not set."""
+    if config.API_PUBLIC_URL and "localhost" not in config.API_PUBLIC_URL:
+        return config.API_PUBLIC_URL
+    # Use actual request host (works for RDP/localhost clients too)
+    return str(request.base_url).rstrip("/")
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
@@ -31,7 +39,7 @@ async def health():
 
 # ─── Single check ─────────────────────────────────────────────────────────────
 @app.get("/check/{endpoint_id}")
-async def check_single(endpoint_id: str, phone: str = Query(...)):
+async def check_single(endpoint_id: str, request: Request, phone: str = Query(...)):
     ep = db.get_endpoint(endpoint_id)
     if not ep or not ep.get("is_active"):
         raise HTTPException(status_code=404, detail="Endpoint not found or disabled")
