@@ -182,10 +182,10 @@ async def poll_all_statuses():
                         if new != "banned" and state.get("retry_count", 0) < MAX_RETRY:
                             state["retry_count"] = state.get("retry_count", 0) + 1
                             backoff = min(300, 30 * state["retry_count"])
-                            asyncio.get_event_loop().call_later(
-                                backoff,
-                                lambda a=aid: asyncio.ensure_future(connect_account(a))
-                            )
+                            async def _retry(a=aid):
+                                await asyncio.sleep(backoff)
+                                await connect_account(a)
+                            asyncio.ensure_future(_retry())
         except Exception as e:
             print(f"[WA Poll] {e}")
         await asyncio.sleep(10)
