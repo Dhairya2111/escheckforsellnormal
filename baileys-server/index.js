@@ -3,7 +3,8 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore
+  makeCacheableSignalKeyStore,
+  Browsers
 } from '@whiskeysockets/baileys';
 import { createClient } from '@supabase/supabase-js';
 import pino from 'pino';
@@ -84,10 +85,12 @@ async function connectAccount(id, accountType = 'checker') {
       version, logger,
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
       printQRInTerminal: false,
-      browser: ['Ubuntu', 'Chrome', '20.0.04'],
+      browser: Browsers.ubuntu('Chrome'),
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
-      markOnlineOnConnect: false
+      markOnlineOnConnect: false,
+      keepAliveIntervalMs: 30000,
+      retryRequestDelayMs: 2000,
     });
     acct.sock = sock;
 
@@ -216,7 +219,7 @@ app.post('/accounts/:id/pair', async (req, res) => {
       version, logger,
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
       printQRInTerminal: false,
-      browser: ['Ubuntu', 'Chrome', '20.0.04']
+      browser: Browsers.ubuntu('Chrome')
     });
 
     const acct = { sock, status: 'connecting', qrCode: null, phoneNumber: null, retryCount: 0, wasConnected: false, accountType };
