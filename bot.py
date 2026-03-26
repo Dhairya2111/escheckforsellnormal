@@ -509,8 +509,9 @@ async def _wa_notify(account_id: str, phone: str, event: str):
         pass
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
-def main():
+async def _async_main():
     global _bot_ref
+
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     _bot_ref = app.bot
 
@@ -519,17 +520,24 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
     app.add_error_handler(error_handler)
 
-    async def post_init(application):
-        global _bot_ref
-        _bot_ref = application.bot
+    async with app:
+        _bot_ref = app.bot
         await db.init()
         wa.set_notify_callback(_wa_notify)
         await wa.connect_all_saved()
-        asyncio.get_event_loop().create_task(wa.poll_all_statuses())
+        asyncio.create_task(wa.poll_all_statuses())
         print("✅ Simple WA Checker Bot started!")
+        await app.start()
+        await app.updater.start_polling(
+            drop_pending_updates=True,
+            allowed_updates=["message", "callback_query"],
+        )
+        await asyncio.Event().wait()  # run forever
 
-    app.post_init = post_init
-    app.run_polling(drop_pending_updates=True)
+
+def main():
+    asyncio.run(_async_main())
+
 
 if __name__ == "__main__":
     main()
