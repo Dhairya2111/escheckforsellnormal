@@ -202,9 +202,28 @@ async def check_number(account_id: str, phone: str) -> dict:
         "error":         result.get("error"),
     }
 
+async def _get_connected_fresh() -> list:
+    """Get connected accounts — if Python cache is empty, sync from Baileys first."""
+    connected = get_connected_accounts()
+    if not connected:
+        # Cache miss — fetch live from Baileys and update cache
+        result = await _get("/accounts")
+        if result and isinstance(result.get("accounts"), list):
+            for acct in result["accounts"]:
+                aid = acct.get("id")
+                if not aid:
+                    continue
+                state = _get_state(aid)
+                state["status"] = acct.get("status", "disconnected")
+                state["phone_number"] = acct.get("phoneNumber")
+                if state["status"] == "connected":
+                    db.set_account_connected(aid, True, state["phone_number"])
+        connected = get_connected_accounts()
+    return connected
+
 async def check_number_any(phone: str) -> dict:
     """Check using any connected account (round-robin)."""
-    connected = get_connected_accounts()
+    connected = await _get_connected_fresh()
     if not connected:
         return {"phone": phone, "is_registered": None, "error": "no_accounts_connected"}
     # Pick account with least checks
@@ -212,7 +231,7 @@ async def check_number_any(phone: str) -> dict:
     return await check_number(best["id"], phone)
 
 async def bulk_check(numbers: list, on_progress=None) -> list:
-    connected = get_connected_accounts()
+    connected = await _get_connected_fresh()
     if not connected:
         return [{"phone": n, "is_registered": None, "error": "no_accounts"} for n in numbers]
 
