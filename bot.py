@@ -7,6 +7,9 @@ Features:
 """
 
 import asyncio
+import threading
+import uvicorn
+import api_server
 import io
 import re
 import os
@@ -511,6 +514,12 @@ async def _wa_notify(account_id: str, phone: str, event: str):
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 async def _async_main():
     global _bot_ref
+
+    # Start FastAPI (API server) in background thread — binds port for Render
+    def _run_api():
+        uvicorn.run(api_server.app, host="0.0.0.0", port=config.PORT, log_level="warning")
+    threading.Thread(target=_run_api, daemon=True).start()
+    print(f"✅ API server started on port {config.PORT}")
 
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     _bot_ref = app.bot
